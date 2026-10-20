@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout - Event Ticket</title>
+  <link rel="stylesheet" href="/styles.css">
+  <!-- Poynt Collect SDK -->
+  <script src="https://collect.commerce.godaddy.com/sdk.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎟️ EventTicket</h1>
+    </header>
+
+    <main class="checkout-page">
+      <div class="checkout-layout">
+        <!-- Order Summary -->
+        <div class="order-summary">
+          <h2>Order Summary</h2>
+          <div class="summary-item">
+            <span id="summary-event-name">-</span>
+          </div>
+          <div class="summary-item">
+            <small id="summary-event-date">-</small>
+          </div>
+          <div class="summary-divider"></div>
+          <div class="summary-item total">
+            <span>Total:</span>
+            <span id="summary-price" class="price-large">-</span>
+          </div>
+        </div>
+
+        <!-- Payment Form -->
+        <div class="payment-section">
+          <h2>Payment Details</h2>
+
+          <form id="payment-form">
+            <div class="form-group">
+              <label for="customer-email">Email Address</label>
+              <input
+                type="email"
+                id="customer-email"
+                required
+                placeholder="your@email.com"
+                autocomplete="email"
+              >
+              <small>Your ticket will be sent to this email</small>
+            </div>
+
+            <div class="form-group">
+              <label>Card Information</label>
+              <!-- Poynt Collect card form will mount here -->
+              <div id="card-element"></div>
+            </div>
+
+            <div id="error-message" class="error-message" style="display: none;"></div>
+            <div id="success-message" class="success-message" style="display: none;"></div>
+
+            <button type="submit" id="pay-button" class="btn btn-primary btn-full" disabled>
+              <span id="button-text">Processing...</span>
+              <span id="button-spinner" class="spinner" style="display: none;"></span>
+            </button>
+          </form>
+
+          <div class="secure-badge">
+            🔒 Secure payment powered by GoDaddy Poynt Collect
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let eventData = null;
+    let collectInstance = null;
+    let isFormReady = false;
+    let isProcessing = false;
+
+    // Load event data from session
+    const eventDataStr = sessionStorage.getItem('eventData');
+    if (!eventDataStr) {
+      alert('No event selected. Redirecting to home page.');
+      window.location.href = '/';
+    }
+    eventData = JSON.parse(eventDataStr);
+
+    // Display order summary
+    document.getElementById('summary-event-name').textContent = eventData.name;
+    document.getElementById('summary-event-date').textContent = `${eventData.date} • ${eventData.time}`;
+    document.getElementById('summary-price').textContent = `$${(eventData.price / 100).toFixed(2)}`;
+
+    // Initialize Poynt Collect
+    async function initializeCollect() {
+      try {
+        // Get credentials from server
+        const configResponse = await fetch('/api/config');
+        const config = await configResponse.json();
+
+        // Initialize Poynt Collect SDK
+        collectInstance = new TokenizeJs(config.businessId, config.applicationId);
+
+        // Mount card form
+        const options = {
+          displayComponents: {
+            amount: false,
+            zipCode: true,
+            securityCode: true
+          },
+          styles: {
+            'input': {
+              'font-size': '16px',
+              'color': '#1a1a1a'
+            },
+            'input:focus': {
+              'outline': 'none'
+            }
+          }
+        };
+
+        collectInstance.mount('card-element', document, options);
+
+        // Listen for ready event
+        collectInstance.on('ready', () => {
+          console.log('✓ Poynt Collect card form ready');
+          isFormReady = true;
+          updatePayButton();
+        });
+
+        // Listen for error events
+        collectInstance.on('error', (event) => {
+          console.error('Poynt Collect error:', event);
+          showError(event.data.message || 'An error occurred with the payment form');
+          isProcessing = false;
+          updatePayButton();
+        });
+
+      } catch (error) {
+        console.error('Failed to initialize Poynt Collect:', error);
+        showError('Failed to load payment form. Please refresh the page.');
+      }
+    }
+
+    // Update pay button state
+    function updatePayButton() {
+      const button = document.getElementById('pay-button');
+      const buttonText = document.getElementById('button-text');
+      const email = document.getElementById('customer-email').value;
+
+      if (isProcessing) {
+        button.disabled = true;
+        buttonText.textContent = 'Processing...';
+        document.getElementById('button-spinner').style.display = 'inline-block';
+      } else if (isFormReady && email) {
+        button.disabled = false;
+        buttonText.textContent = `Pay $${(eventData.price / 100).toFixed(2)}`;
+        document.getElementById('button-spinner').style.display = 'none';
+      } else {
+        button.disabled = true;
+        buttonText.textContent = isFormReady ? 'Enter email to continue' : 'Loading...';
+        document.getElementById('button-spinner').style.display = 'none';
+      }
+    }
+
+    // Email input validation
+    document.getElementById('customer-email').addEventListener('input', updatePayButton);
+
+    // Handle form submission
+    document.getElementById('payment-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (isProcessing || !isFormReady) {
+        return;
+      }
+
+      isProcessing = true;
+      hideMessages();
+      updatePayButton();
+
+      try {
+        const email = document.getElementById('customer-email').value;
+
+        // Get nonce from Poynt Collect
+        console.log('Requesting nonce from Poynt Collect...');
+        collectInstance.getNonce({
+          amount: eventData.price,
+          currency: 'USD'
+        });
+
+        // Listen for nonce
+        collectInstance.on('nonce', async (event) => {
+          const nonce = event.data.nonce;
+
+          if (!nonce) {
+            showError('Failed to process card information. Please try again.');
+            isProcessing = false;
+            updatePayButton();
+            return;
+          }
+
+          console.log('✓ Nonce received, processing payment...');
+
+          // Send nonce to server for charging
+          try {
+            const response = await fetch('/api/charge', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                nonce: nonce,
+                amount: eventData.price,
+                eventId: eventData.id,
+                customerEmail: email
+              })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+              console.log('✓ Payment successful!');
+              // Store ticket ID and redirect to ticket page
+              sessionStorage.setItem('ticketId', result.ticketId);
+              sessionStorage.setItem('ticketData', JSON.stringify({
+                ...eventData,
+                ticketId: result.ticketId,
+                transactionId: result.transactionId,
+                customerEmail: email
+              }));
+              window.location.href = '/ticket';
+            } else {
+              showError(result.error || 'Payment failed. Please try again.');
+              isProcessing = false;
+              updatePayButton();
+            }
+          } catch (error) {
+            console.error('Payment request failed:', error);
+            showError('Payment processing failed. Please try again.');
+            isProcessing = false;
+            updatePayButton();
+          }
+        });
+
+      } catch (error) {
+        console.error('Payment error:', error);
+        showError('An error occurred. Please try again.');
+        isProcessing = false;
+        updatePayButton();
+      }
+    });
+
+    // Helper functions
+    function showError(message) {
+      const errorEl = document.getElementById('error-message');
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
+    }
+
+    function showSuccess(message) {
+      const successEl = document.getElementById('success-message');
+      successEl.textContent = message;
+      successEl.style.display = 'block';
+    }
+
+    function hideMessages() {
+      document.getElementById('error-message').style.display = 'none';
+      document.getElementById('success-message').style.display = 'none';
+    }
+
+    // Initialize on page load
+    initializeCollect();
+  </script>
+</body>
+</html>

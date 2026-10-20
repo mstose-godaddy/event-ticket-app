@@ -1,0 +1,153 @@
+═══════════════════════════════════════════════════════════════════
+           POYNT COLLECT - QUICK REFERENCE CARD
+═══════════════════════════════════════════════════════════════════
+
+CREDENTIALS (from poynt.godaddy.com > Business Settings)
+─────────────────────────────────────────────────────────────────
+Dashboard shows: abc-123-def=urn:aid:xyz-789
+                 └─Business ID─┘ └─Application ID──┘
+
+BUSINESS_ID:     The UUID part (before =)
+APPLICATION_ID:  The urn:aid part (after =)
+PRIVATE_KEY:     Download PEM file
+
+
+AUTHENTICATION (Access Token)
+─────────────────────────────────────────────────────────────────
+1. Create JWT (RS256):
+   {
+     "iss": "<APPLICATION_ID>",
+     "sub": "<APPLICATION_ID>",
+     "aud": "https://services.poynt.net",
+     "iat": <current_timestamp>,
+     "exp": <iat + 300>,
+     "jti": "<unique_uuid>"
+   }
+
+2. POST https://services.poynt.net/token
+   Headers: api-version: 1.2
+   Body: grantType=urn:ietf:params:oauth:grant-type:jwt-bearer
+         &assertion=<signed_jwt>
+
+3. Cache token (expires in ~1 hour)
+
+
+STORE LOOKUP
+─────────────────────────────────────────────────────────────────
+GET https://services.poynt.net/businesses/{BUSINESS_ID}/stores
+Headers: Authorization: Bearer <token>
+Result: Use stores[0].id
+
+
+FRONTEND (Card Form)
+─────────────────────────────────────────────────────────────────
+<script src="https://collect.commerce.godaddy.com/sdk.js"></script>
+
+const collect = new TokenizeJs(businessId, applicationId);
+collect.mount('card-element', document, options);
+
+collect.on('ready', () => { /* enable pay button */ });
+collect.on('error', (e) => { /* show error */ });
+
+// On submit:
+collect.getNonce({ amount: cents, currency: 'USD' });
+collect.on('nonce', (e) => {
+  const nonce = e.data.nonce;
+  // Send nonce to your server
+});
+
+
+CHARGE (Backend)
+─────────────────────────────────────────────────────────────────
+POST https://services.poynt.net/businesses/{BUSINESS_ID}/cards/tokenize/charge
+
+Headers:
+  Authorization: Bearer <token>
+  Content-Type: application/json
+  api-version: 1.2
+
+Body:
+{
+  "action": "SALE",
+  "context": {
+    "businessId": "<BUSINESS_ID>",
+    "storeId": "<STORE_ID>"
+  },
+  "amounts": {
+    "transactionAmount": 7500,  // cents
+    "orderAmount": 7500,
+    "currency": "USD"
+  },
+  "fundingSource": {
+    "nonce": "<nonce_from_frontend>"
+  }
+}
+
+Response:
+  status: "AUTHORIZED" = success
+  status: "DECLINED" = failed
+
+
+COMMON ERRORS
+─────────────────────────────────────────────────────────────────
+"No Active Payment Token"
+  → Account not active. Contact GoDaddy support.
+
+401 Unauthorized
+  → Check credentials. Verify APPLICATION_ID starts with urn:aid:
+
+Card form doesn't show
+  → Check Business ID and Application ID in browser console
+
+Missing nonce
+  → Wait for 'ready' event before enabling pay button
+
+
+TEST CARDS (Test Merchant Only)
+─────────────────────────────────────────────────────────────────
+Success: 4111 1111 1111 1111
+Decline: 4000 0000 0000 0002
+Any future expiry, any CVV
+
+
+AMOUNTS
+─────────────────────────────────────────────────────────────────
+Always in CENTS (integers)
+  $75.00 = 7500
+  $1.00 = 100
+
+
+SECURITY CHECKLIST
+─────────────────────────────────────────────────────────────────
+✓ Private key stays server-side only
+✓ Use HTTPS in production  
+✓ Never commit .env file
+✓ Validate nonce exists before charging
+✓ Cache and refresh access token
+✓ Save transaction IDs
+
+
+FILES IN THIS APP
+─────────────────────────────────────────────────────────────────
+START-HERE.md              ← Read this first!
+SETUP-GUIDE.md             ← Step-by-step setup
+DRY-RUN-CHECKLIST.md       ← Validate your integration guide
+INTEGRATION-FLOW.md        ← Complete technical flow
+README.md                  ← Full documentation
+server.js                  ← Backend code
+public/checkout.html       ← Frontend payment form
+.env                       ← Your credentials (NEVER commit!)
+
+
+QUICK START
+─────────────────────────────────────────────────────────────────
+1. Get credentials from poynt.godaddy.com
+2. Edit .env file with your credentials
+3. npm start
+4. Open http://localhost:3000
+5. Buy a ticket!
+
+
+═══════════════════════════════════════════════════════════════════
+           Ready to test? Open START-HERE.md
+═══════════════════════════════════════════════════════════════════

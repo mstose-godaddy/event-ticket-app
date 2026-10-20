@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Ticket Purchase</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎟️ EventTicket</h1>
+    </header>
+
+    <main id="event-details" class="event-card">
+      <div class="event-image">
+        <div class="placeholder-image">📅</div>
+      </div>
+      <div class="event-info">
+        <h2 id="event-name">Loading...</h2>
+        <div class="event-meta">
+          <p><strong>📅 Date:</strong> <span id="event-date">-</span></p>
+          <p><strong>🕐 Time:</strong> <span id="event-time">-</span></p>
+          <p><strong>📍 Location:</strong> <span id="event-location">-</span></p>
+        </div>
+        <p class="event-description" id="event-description">-</p>
+        <div class="event-footer">
+          <div class="price">
+            <span class="price-label">Ticket Price:</span>
+            <span class="price-amount" id="event-price">-</span>
+          </div>
+          <button id="buy-button" class="btn btn-primary" disabled>
+            Buy Ticket
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>Powered by Poynt Collect</p>
+    </footer>
+  </div>
+
+  <script>
+    let eventData = null;
+
+    // Load event details
+    async function loadEvent() {
+      try {
+        const response = await fetch('/api/event');
+        eventData = await response.json();
+
+        document.getElementById('event-name').textContent = eventData.name;
+        document.getElementById('event-date').textContent = eventData.date;
+        document.getElementById('event-time').textContent = eventData.time;
+        document.getElementById('event-location').textContent = eventData.location;
+        document.getElementById('event-description').textContent = eventData.description;
+        document.getElementById('event-price').textContent = `$${(eventData.price / 100).toFixed(2)}`;
+
+        document.getElementById('buy-button').disabled = false;
+      } catch (error) {
+        console.error('Failed to load event:', error);
+        alert('Failed to load event details. Please refresh the page.');
+      }
+    }
+
+    // Navigate to checkout
+    document.getElementById('buy-button').addEventListener('click', () => {
+      if (eventData) {
+        sessionStorage.setItem('eventData', JSON.stringify(eventData));
+        window.location.href = '/checkout';
+      }
+    });
+
+    loadEvent();
+  </script>
+</body>
+</html>

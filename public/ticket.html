@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Ticket - Event Ticket</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎟️ EventTicket</h1>
+    </header>
+
+    <main class="ticket-page">
+      <div class="success-banner">
+        <div class="success-icon">✓</div>
+        <h2>Payment Successful!</h2>
+        <p>Your ticket has been confirmed</p>
+      </div>
+
+      <div class="ticket-card">
+        <div class="ticket-header">
+          <h3>YOUR TICKET</h3>
+          <div class="ticket-barcode">||||  ||  ||||  ||  ||||</div>
+        </div>
+
+        <div class="ticket-body">
+          <div class="ticket-field">
+            <label>Event</label>
+            <div class="ticket-value" id="ticket-event-name">-</div>
+          </div>
+
+          <div class="ticket-row">
+            <div class="ticket-field">
+              <label>Date</label>
+              <div class="ticket-value" id="ticket-date">-</div>
+            </div>
+            <div class="ticket-field">
+              <label>Time</label>
+              <div class="ticket-value" id="ticket-time">-</div>
+            </div>
+          </div>
+
+          <div class="ticket-field">
+            <label>Location</label>
+            <div class="ticket-value" id="ticket-location">-</div>
+          </div>
+
+          <div class="ticket-divider"></div>
+
+          <div class="ticket-field">
+            <label>Ticket ID</label>
+            <div class="ticket-value ticket-id" id="ticket-id">-</div>
+          </div>
+
+          <div class="ticket-field">
+            <label>Email</label>
+            <div class="ticket-value" id="ticket-email">-</div>
+          </div>
+        </div>
+
+        <div class="ticket-footer">
+          <h4>Payment Receipt</h4>
+          <div class="receipt-row">
+            <span>Amount Paid:</span>
+            <span id="receipt-amount">-</span>
+          </div>
+          <div class="receipt-row">
+            <span>Transaction ID:</span>
+            <span id="receipt-transaction-id" class="transaction-id">-</span>
+          </div>
+          <div class="receipt-row">
+            <span>Status:</span>
+            <span class="status-badge">CONFIRMED</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ticket-actions">
+        <button onclick="window.print()" class="btn btn-secondary">
+          🖨️ Print Ticket
+        </button>
+        <button onclick="window.location.href='/'" class="btn btn-primary">
+          ← Back to Events
+        </button>
+      </div>
+
+      <div class="important-notice">
+        <strong>Important:</strong> Please save this page or take a screenshot.
+        This ticket and receipt confirm your purchase and serve as your entry pass.
+      </div>
+    </main>
+
+    <footer>
+      <p>Keep this ticket for your records • Powered by Poynt Collect</p>
+    </footer>
+  </div>
+
+  <script>
+    // Load ticket data from session
+    const ticketDataStr = sessionStorage.getItem('ticketData');
+    if (!ticketDataStr) {
+      alert('No ticket found. Redirecting to home page.');
+      window.location.href = '/';
+    }
+
+    const ticketData = JSON.parse(ticketDataStr);
+
+    // Populate ticket details
+    document.getElementById('ticket-event-name').textContent = ticketData.name;
+    document.getElementById('ticket-date').textContent = ticketData.date;
+    document.getElementById('ticket-time').textContent = ticketData.time;
+    document.getElementById('ticket-location').textContent = ticketData.location;
+    document.getElementById('ticket-id').textContent = ticketData.ticketId;
+    document.getElementById('ticket-email').textContent = ticketData.customerEmail;
+    document.getElementById('receipt-amount').textContent = `$${(ticketData.price / 100).toFixed(2)} USD`;
+    document.getElementById('receipt-transaction-id').textContent = ticketData.transactionId;
+
+    // Update page title
+    document.title = `Ticket - ${ticketData.name}`;
+  </script>
+</body>
+</html>
